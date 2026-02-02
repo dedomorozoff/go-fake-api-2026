@@ -31,6 +31,8 @@ jobs:
           # macOS
           GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o build/board-api-macos-amd64 main.go
           GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o build/board-api-macos-arm64 main.go
+          # FreeBSD
+          GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o build/board-api-freebsd-amd64 main.go
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -40,5 +42,6 @@ jobs:
             build/board-api-linux-amd64
             build/board-api-macos-amd64
             build/board-api-macos-arm64
+            build/board-api-freebsd-amd64
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
