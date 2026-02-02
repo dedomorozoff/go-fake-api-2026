@@ -9,7 +9,11 @@ import (
 	"github.com/alexl/go-fake-api/internal/middleware"
 	"github.com/alexl/go-fake-api/internal/storage"
 	"github.com/gorilla/mux"
+	_ "embed"
 )
+
+//go:embed API_DOCUMENTATION.md
+var documentation []byte
 
 func main() {
 	// Инициализация хранилища
@@ -37,6 +41,7 @@ func main() {
 	})
 
 	// Публичные эндпоинты
+	r.HandleFunc("/", api.GetDocumentation(documentation)).Methods("GET")
 	r.HandleFunc("/registration", api.Registration(store)).Methods("POST")
 	r.HandleFunc("/authorization", api.Authorization(store)).Methods("POST")
 	r.HandleFunc("/public-boards", api.GetPublicBoards(store)).Methods("GET")
