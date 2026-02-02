@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build binaries
+        run: |
+          mkdir -p build
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o build/board-api-windows-amd64.exe main.go
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o build/board-api-linux-amd64 main.go
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o build/board-api-macos-amd64 main.go
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o build/board-api-macos-arm64 main.go
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/board-api-windows-amd64.exe
+            build/board-api-linux-amd64
+            build/board-api-macos-amd64
+            build/board-api-macos-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
