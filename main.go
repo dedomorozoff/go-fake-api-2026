@@ -43,16 +43,29 @@ func main() {
 	// Создание роутера
 	r := mux.NewRouter()
 
-	// Middleware для CORS
+	// Middleware для CORS - полная отмена проверок для тестового API
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			// Разрешаем все origins
+			origin := r.Header.Get("Origin")
+			if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			} else {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			}
+			
+			// Разрешаем все методы и заголовки
+			w.Header().Set("Access-Control-Allow-Methods", "*")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Max-Age", "86400")
+			
+			// Обрабатываем preflight запросы
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
+			
 			next.ServeHTTP(w, r)
 		})
 	})
@@ -66,21 +79,22 @@ func main() {
 	}
 
 	// Публичные эндпоинты
-	apiRouter.HandleFunc("/", api.GetDocumentation(documentation)).Methods("GET")
-	apiRouter.HandleFunc("/registration", api.Registration(store)).Methods("POST")
-	apiRouter.HandleFunc("/authorization", api.Authorization(store)).Methods("POST")
-	apiRouter.HandleFunc("/public-boards", api.GetPublicBoards(store)).Methods("GET")
-	apiRouter.HandleFunc("/board/{hash}", api.GetBoardByHash(store)).Methods("GET")
+	apiRouter.HandleFunc("/", api.GetDocumentation(documentation)).Methods("GET", "OPTIONS")
+	apiRouter.HandleFunc("/registration", api.Registration(store)).Methods("POST", "OPTIONS")
+	apiRouter.HandleFunc("/authorization", api.Authorization(store)).Methods("POST", "OPTIONS")
+	apiRouter.HandleFunc("/public-boards", api.GetPublicBoards(store)).Methods("GET", "OPTIONS")
+	apiRouter.HandleFunc("/board/{hash}", api.GetBoardByHash(store)).Methods("GET", "OPTIONS")
 
 	// Защищенные эндпоинты
 	protected := apiRouter.PathPrefix("").Subrouter()
 	protected.Use(middleware.AuthMiddleware(store))
 
-	protected.HandleFunc("/logout", api.Logout(store)).Methods("GET")
-	protected.HandleFunc("/boards", api.CreateBoard(store)).Methods("POST")
-	protected.HandleFunc("/boards", api.GetUserBoards(store)).Methods("GET")
-	protected.HandleFunc("/boards/{board_id}/share", api.ShareBoard(store)).Methods("POST")
-	protected.HandleFunc("/boards/{board_id}/like", api.LikeBoard(store)).Methods("POST")
+	// Добавляем OPTIONS методы для всех защищенных эндпоинтов
+	protected.HandleFunc("/logout", api.Logout(store)).Methods("GET", "OPTIONS")
+	protected.HandleFunc("/boards", api.CreateBoard(store)).Methods("POST", "OPTIONS")
+	protected.HandleFunc("/boards", api.GetUserBoards(store)).Methods("GET", "OPTIONS")
+	protected.HandleFunc("/boards/{board_id}/share", api.ShareBoard(store)).Methods("POST", "OPTIONS")
+	protected.HandleFunc("/boards/{board_id}/like", api.LikeBoard(store)).Methods("POST", "OPTIONS")
 
 	// WebSocket
 	apiRouter.HandleFunc("/ws/board/{board_id}", api.ServeWs(hub, store))
