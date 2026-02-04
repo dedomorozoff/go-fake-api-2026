@@ -1,9 +1,11 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/alexl/go-fake-api/internal/api"
 	"github.com/alexl/go-fake-api/internal/middleware"
@@ -16,6 +18,21 @@ import (
 var documentation []byte
 
 func main() {
+	// Парсинг аргументов командной строки
+	var baseURL string
+	var port string
+	flag.StringVar(&baseURL, "base-url", "", "Base URL path for the API (e.g., /api/v1)")
+	flag.StringVar(&port, "port", "", "Port to listen on (default: 8080 or PORT env var)")
+	flag.Parse()
+
+	// Нормализация base URL
+	if baseURL != "" {
+		baseURL = strings.TrimSuffix(baseURL, "/")
+		if !strings.HasPrefix(baseURL, "/") {
+			baseURL = "/" + baseURL
+		}
+	}
+
 	// Инициализация хранилища
 	store := storage.NewMemoryStorage()
 
@@ -40,15 +57,23 @@ func main() {
 		})
 	})
 
+	// Создание подроутера с базовым URL если указан
+	var apiRouter *mux.Router
+	if baseURL != "" {
+		apiRouter = r.PathPrefix(baseURL).Subrouter()
+	} else {
+		apiRouter = r
+	}
+
 	// Публичные эндпоинты
-	r.HandleFunc("/", api.GetDocumentation(documentation)).Methods("GET")
-	r.HandleFunc("/registration", api.Registration(store)).Methods("POST")
-	r.HandleFunc("/authorization", api.Authorization(store)).Methods("POST")
-	r.HandleFunc("/public-boards", api.GetPublicBoards(store)).Methods("GET")
-	r.HandleFunc("/board/{hash}", api.GetBoardByHash(store)).Methods("GET")
+	apiRouter.HandleFunc("/", api.GetDocumentation(documentation)).Methods("GET")
+	apiRouter.HandleFunc("/registration", api.Registration(store)).Methods("POST")
+	apiRouter.HandleFunc("/authorization", api.Authorization(store)).Methods("POST")
+	apiRouter.HandleFunc("/public-boards", api.GetPublicBoards(store)).Methods("GET")
+	apiRouter.HandleFunc("/board/{hash}", api.GetBoardByHash(store)).Methods("GET")
 
 	// Защищенные эндпоинты
-	protected := r.PathPrefix("").Subrouter()
+	protected := apiRouter.PathPrefix("").Subrouter()
 	protected.Use(middleware.AuthMiddleware(store))
 
 	protected.HandleFunc("/logout", api.Logout(store)).Methods("GET")
@@ -58,15 +83,22 @@ func main() {
 	protected.HandleFunc("/boards/{board_id}/like", api.LikeBoard(store)).Methods("POST")
 
 	// WebSocket
-	r.HandleFunc("/ws/board/{board_id}", api.ServeWs(hub, store))
+	apiRouter.HandleFunc("/ws/board/{board_id}", api.ServeWs(hub, store))
 
-	// Получение порта из переменной окружения
-	port := os.Getenv("PORT")
+	// Получение порта из аргумента командной строки или переменной окружения
 	if port == "" {
-		port = "8080"
+		port = os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
 	}
 
-	log.Printf("Server starting on port %s...", port)
+	if baseURL != "" {
+		log.Printf("Server starting on port %s with base URL %s...", port, baseURL)
+	} else {
+		log.Printf("Server starting on port %s...", port)
+	}
+	
 	if err := http.ListenAndServe(":"+port, r); err != nil {
 		log.Fatal(err)
 	}

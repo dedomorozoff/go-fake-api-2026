@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alexl/go-fake-api/internal/middleware"
 	"github.com/alexl/go-fake-api/internal/models"
 	"github.com/alexl/go-fake-api/internal/storage"
 	"github.com/alexl/go-fake-api/internal/utils"
@@ -15,7 +16,7 @@ import (
 // CreateBoard создает новую доску
 func CreateBoard(s storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value("user").(*models.User)
+		user := r.Context().Value(middleware.UserContextKey).(*models.User)
 
 		var req models.BoardCreateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -48,7 +49,7 @@ func CreateBoard(s storage.Storage) http.HandlerFunc {
 // GetUserBoards возвращает доски, к которым у пользователя есть доступ
 func GetUserBoards(s storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value("user").(*models.User)
+		user := r.Context().Value(middleware.UserContextKey).(*models.User)
 
 		boards, err := s.GetUserBoards(user.ID)
 		if err != nil {
@@ -76,7 +77,7 @@ func GetPublicBoards(s storage.Storage) http.HandlerFunc {
 // ShareBoard предоставляет доступ к доске
 func ShareBoard(s storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value("user").(*models.User)
+		user := r.Context().Value(middleware.UserContextKey).(*models.User)
 		vars := mux.Vars(r)
 		boardID := vars["board_id"]
 
@@ -131,7 +132,7 @@ func GetBoardByHash(s storage.Storage) http.HandlerFunc {
 // LikeBoard ставит лайк доске
 func LikeBoard(s storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value("user").(*models.User)
+		user := r.Context().Value(middleware.UserContextKey).(*models.User)
 		vars := mux.Vars(r)
 		boardID := vars["board_id"]
 
